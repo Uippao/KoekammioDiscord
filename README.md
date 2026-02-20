@@ -1,5 +1,6 @@
 # KoekammioDiscord
-KoekammioDiscord is a simple but customizable SCP:SL server status indicator bot. It is built on LabAPI and Discord.NET, aiming to provide an easy way to indicate the status of your SCP:SL server in your Discord server.
+KoekammioDiscord is a simple but customizable event-based SCP:SL server status indicator bot. It is built on LabAPI and Discord.NET, aiming to provide an easy way to indicate the status of your SCP:SL server in your Discord server.
+The approach is to be very simple by only doing one thing. If you want a more extensive solution, this might not be for you. Despite this, it consists of only one component to further simplify the experience.
 KoekammioDiscord provides a simple configuration which allows you to customize/translate it to suit your needs.
 
 ## Setup
