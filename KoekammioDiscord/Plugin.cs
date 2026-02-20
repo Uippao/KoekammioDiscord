@@ -32,7 +32,7 @@ namespace KoekammioDiscord
 
             if (!Config.isEnabled)
             {
-                Logger.Info("KoekammioDiscord is disabled in config. Skipping initialization.");
+                Logger.Info("KoekammioDiscord is disabled in config.");
                 return;
             }
 
@@ -55,7 +55,7 @@ namespace KoekammioDiscord
                 await _client.StartAsync();
             });
 
-            Logger.Info("KoekammioDiscord enabled (event-based).");
+            Logger.Info("KoekammioDiscord enabled.");
         }
 
         public override void Disable()
