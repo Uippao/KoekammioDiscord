@@ -123,12 +123,12 @@ namespace KoekammioDiscord
 
         private void OnWaitingForPlayers()
         {
-            Debug("Waiting for players phase entered.");
+            Debug("Entered waiting for players state.");
             _playerCount = Player.ReadyList.Count(p => !p.IsDummy);
 
             string waitingText = Config.statuses.waitingForPlayers.text.Replace("{count}", _playerCount.ToString());
             UserStatus waitingStatus = MapStatus(Config.statuses.waitingForPlayers.status);
-            Debug($"Force-setting WaitingForPlayers state: \"{waitingText}\" ({waitingStatus})");
+            Debug($"Forcing WaitingForPlayers state: \"{waitingText}\" ({waitingStatus})");
 
             _ = Task.Run(async () =>
             {
