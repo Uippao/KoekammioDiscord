@@ -4,13 +4,14 @@ The approach is to be very simple by only doing one thing. If you want a more ex
 KoekammioDiscord provides a simple configuration which allows you to customize/translate it to suit your needs.
 
 ## Setup
-1. Download the latest version of `KoekammioDiscord.dll` from the releases page.
-2. Place it into `YOUR_SERVER_DIR/LabAPI/plugins/global/`, or alternatively into a specific port's directory instead of global.
-3. Restart the server to generate the configs into `YOUR_SERVER_DIR/LabAPI/configs/PORT/KoekammioDiscord/config.yml`
-4. Create a discord bot. I'm too lazy to explain the process here, but there are loads of guides on how to do it.
-5. Get your bot token, and replace the placeholder in the config with it. Configure further however you please.
-6. Add the bot to any servers you want it to be in, maybe give it a special role and place on the server list.
-7. You're done!
+1. Download the latest version of `KoekammioDiscord.dll` as well as `dependencies.zip` from the releases page.
+2. Place `KoekammioDiscord.dll` into `YOUR_SERVER_DIR/LabAPI/plugins/global/`, or alternatively into a specific port's directory instead of global.
+3. Extract `dependencies.zip` into `YOUR_SERVER_DIR/LabAPI/dependencies/global/`, or alternatively into a specific port's directory instead of global.
+4. Restart the server to generate the configs into `YOUR_SERVER_DIR/LabAPI/configs/PORT/KoekammioDiscord/config.yml`
+5. Create a discord bot. I'm too lazy to explain the process here, but there are loads of guides on how to do it.
+6. Get your bot token, and replace the placeholder in the config with it. Configure further however you please.
+7. Add the bot to any servers you want it to be in, maybe give it a special role and place on the server list.
+8. You're done!
 
 ## Configuration
 The default configuration of the plugin for reference:
