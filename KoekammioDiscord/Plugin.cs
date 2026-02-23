@@ -18,7 +18,7 @@ namespace KoekammioDiscord
         public override string Name => "KoekammioDiscord";
         public override string Description => "A simple but customizable server status indicator Discord bot.";
         public override string Author => "Uippao";
-        public override Version Version => new Version(1, 0, 1, 0);
+        public override Version Version => new Version(1, 1, 0, 0);
         public override Version RequiredApiVersion => new Version(LabApiProperties.CompiledVersion);
 
         private DiscordSocketClient _client;
