@@ -1,9 +1,10 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
-using LabApi.Events.Handlers;
 using LabApi.Events.Arguments.PlayerEvents;
 using LabApi.Events.Arguments.ServerEvents;
+using LabApi.Events.Handlers;
 using LabApi.Features;
 using LabApi.Loader.Features.Plugins;
 using Discord;
@@ -18,13 +19,22 @@ namespace KoekammioDiscord
         public override string Name => "KoekammioDiscord";
         public override string Description => "A simple but customizable server status indicator Discord bot.";
         public override string Author => "Uippao";
-        public override Version Version => new Version(1, 1, 0, 0);
+        public override Version Version => new Version(1, 2, 0, 0);
         public override Version RequiredApiVersion => new Version(LabApiProperties.CompiledVersion);
 
         private DiscordSocketClient _client;
-        private int _playerCount;
-        private DateTime _lastStatusUpdate = DateTime.MinValue;
-        private bool _updatePending = false;
+        private CancellationTokenSource _cts;
+        private Task _statusLoopTask;
+
+        private int _lastPlayerCount = -1;
+        private string _lastText = null;
+        private UserStatus _lastStatus = UserStatus.Idle;
+
+        private volatile bool _forceUpdate = false;
+        private volatile bool _needInitialRoundDelay = false;
+
+        private int _pollIntervalMs;
+        private int _waitingForPlayersDelayMs;
 
         public override void Enable()
         {
@@ -35,9 +45,9 @@ namespace KoekammioDiscord
                 Logger.Info("KoekammioDiscord is disabled in config.");
                 return;
             }
+            _pollIntervalMs = Config.timing.pollIntervalSeconds * 1000;
+            _waitingForPlayersDelayMs = Config.timing.waitingForPlayersDelaySeconds * 1000;
 
-            PlayerEvents.Joined += OnPlayerJoined;
-            PlayerEvents.Left += OnPlayerLeft;
             ServerEvents.RoundStarted += OnRoundStarted;
             ServerEvents.WaitingForPlayers += OnWaitingForPlayers;
             ServerEvents.RoundEnded += OnRoundEnded;
@@ -63,11 +73,25 @@ namespace KoekammioDiscord
             if (!Config.isEnabled)
                 return;
 
-            PlayerEvents.Joined -= OnPlayerJoined;
-            PlayerEvents.Left -= OnPlayerLeft;
             ServerEvents.RoundStarted -= OnRoundStarted;
             ServerEvents.WaitingForPlayers -= OnWaitingForPlayers;
             ServerEvents.RoundEnded -= OnRoundEnded;
+
+            try
+            {
+                _cts?.Cancel();
+                _statusLoopTask?.GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Error while stopping status loop: {ex}");
+            }
+            finally
+            {
+                _cts?.Dispose();
+                _cts = null;
+                _statusLoopTask = null;
+            }
 
             if (_client != null)
             {
@@ -90,108 +114,114 @@ namespace KoekammioDiscord
 
         private async Task OnDiscordReady()
         {
-            Logger.Info($"Discord bot connected as {_client.CurrentUser.Username}#{_client.CurrentUser.Discriminator}");
-            await Task.Delay(3000);
-            _playerCount = Player.ReadyList.Count(p => !p.IsDummy);
-            await UpdateStatusAsync();
-        }
-
-        private void OnPlayerJoined(PlayerJoinedEventArgs ev)
-        {
-            _playerCount = Player.ReadyList.Count(p => !p.IsDummy);
-            Debug($"Player joined. New count: {_playerCount}");
-            _ = SafeUpdateStatusAsync();
-        }
-
-        private void OnPlayerLeft(PlayerLeftEventArgs ev)
-        {
-            _ = Task.Run(async () =>
+            try
             {
-                await Task.Delay(100);
-                _playerCount = Player.ReadyList.Count(p => !p.IsDummy);
-                Debug($"Player left. New count: {_playerCount}");
-                await SafeUpdateStatusAsync();
-            });
+                Logger.Info($"Discord bot connected as {_client.CurrentUser.Username}#{_client.CurrentUser.Discriminator}");
+
+                _lastPlayerCount = -1;
+                _lastText = null;
+
+                _cts = new CancellationTokenSource();
+                _statusLoopTask = Task.Run(() => StatusLoopAsync(_cts.Token), _cts.Token);
+
+                await Task.Delay(1000);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"OnDiscordReady error: {ex}");
+            }
         }
 
         private void OnRoundStarted()
         {
-            Debug("Round started.");
-            _playerCount = Player.ReadyList.Count(p => !p.IsDummy);
-            _ = SafeUpdateStatusAsync();
+            Debug("Round started (event). Will apply initial stabilization delay before measuring.");
+            _needInitialRoundDelay = true;
+            _forceUpdate = true;
         }
 
         private void OnWaitingForPlayers()
         {
-            Debug("Entered waiting for players state.");
-            _playerCount = Player.ReadyList.Count(p => !p.IsDummy);
-
-            string waitingText = Config.statuses.waitingForPlayers.text.Replace("{count}", _playerCount.ToString());
-            UserStatus waitingStatus = MapStatus(Config.statuses.waitingForPlayers.status);
-            Debug($"Forcing WaitingForPlayers state: \"{waitingText}\" ({waitingStatus})");
-
-            _ = Task.Run(async () =>
-            {
-                await _client.SetActivityAsync(new Discord.CustomStatusGame(waitingText));
-                await _client.SetStatusAsync(waitingStatus);
-            });
+            Debug("Entered waiting for players (event). Forcing an update on next poll.");
+            _forceUpdate = true;
         }
 
         private void OnRoundEnded(RoundEndedEventArgs ev)
         {
-            Debug("Round ended.");
-            _playerCount = Player.ReadyList.Count(p => !p.IsDummy);
-            _ = SafeUpdateStatusAsync();
+            Debug("Round ended (event). Forcing an update on next poll.");
+            _forceUpdate = true;
         }
 
-        private async Task SafeUpdateStatusAsync()
+        private async Task StatusLoopAsync(CancellationToken token)
         {
-            var now = DateTime.UtcNow;
-            var elapsed = (now - _lastStatusUpdate).TotalSeconds;
+            await Task.Delay(500, token).ConfigureAwait(false);
 
-            if (elapsed < 3)
+            while (!token.IsCancellationRequested)
             {
-                if (!_updatePending)
+                try
                 {
-                    _updatePending = true;
-                    double delay = 3 - elapsed;
-                    _ = Task.Run(async () =>
+                    if (_needInitialRoundDelay)
                     {
-                        await Task.Delay(TimeSpan.FromSeconds(delay));
-                        _updatePending = false;
-                        await UpdateStatusAsync();
-                    });
-                    Debug("Queued status update due to rate limit.");
+                        Debug($"WaitingForPlayers stabilization delay: {_waitingForPlayersDelayMs}ms.");
+
+                        try
+                        {
+                            await Task.Delay(_waitingForPlayersDelayMs, token).ConfigureAwait(false);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            break;
+                        }
+
+                        _needInitialRoundDelay = false;
+                    }
+
+                    await CheckAndUpdateStatusAsync(token).ConfigureAwait(false);
                 }
-                else
+                catch (OperationCanceledException)
                 {
-                    Debug("Skipped status update (already queued).");
+                    break;
                 }
-                return;
+                catch (Exception ex)
+                {
+                    Logger.Error($"Status loop error: {ex}");
+                }
+
+                try
+                {
+                    await Task.Delay(_pollIntervalMs, token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
             }
 
-            _lastStatusUpdate = now;
-            await UpdateStatusAsync();
+            Debug("Status loop ended.");
         }
 
-        private async Task UpdateStatusAsync()
+        private async Task CheckAndUpdateStatusAsync(CancellationToken token)
         {
             if (_client == null || !_client.LoginState.HasFlag(LoginState.LoggedIn))
                 return;
 
-            _playerCount = Player.ReadyList.Count(p => !p.IsDummy);
+            int playerCount = Player.ReadyList.Count(p => !p.IsDummy);
 
             string text;
-            UserStatus discordStatus = UserStatus.Idle;
+            UserStatus discordStatus;
 
-            if (!Round.IsRoundStarted)
+            if (playerCount == 0 && !Round.IsRoundStarted)
+            {
+                text = Config.statuses.waitingForPlayers.text;
+                discordStatus = MapStatus(Config.statuses.waitingForPlayers.status);
+            }
+            else if (!Round.IsRoundStarted)
             {
                 text = Config.statuses.waitingForPlayers.text;
                 discordStatus = MapStatus(Config.statuses.waitingForPlayers.status);
             }
             else if (Round.IsRoundInProgress)
             {
-                if (_playerCount == 0)
+                if (playerCount == 0)
                 {
                     text = Config.statuses.noPlayers.text;
                     discordStatus = MapStatus(Config.statuses.noPlayers.status);
@@ -213,16 +243,41 @@ namespace KoekammioDiscord
                 discordStatus = MapStatus(Config.statuses.waitingForPlayers.status);
             }
 
-            text = text.Replace("{count}", _playerCount.ToString());
+            text = text.Replace("{count}", playerCount.ToString());
+
+            bool nothingChanged =
+                playerCount == _lastPlayerCount &&
+                string.Equals(text, _lastText, StringComparison.Ordinal) &&
+                discordStatus == _lastStatus;
+
+            if (nothingChanged && !_forceUpdate)
+            {
+                Debug("No state change detected; skipping Discord update.");
+                return;
+            }
+
+            _forceUpdate = false;
+
             Debug($"Updating Discord status: \"{text}\" ({discordStatus})");
 
-            await _client.SetActivityAsync(new Discord.CustomStatusGame(text));
-            await _client.SetStatusAsync(discordStatus);
+            _lastPlayerCount = playerCount;
+            _lastText = text;
+            _lastStatus = discordStatus;
+
+            try
+            {
+                await _client.SetActivityAsync(new Discord.CustomStatusGame(text)).ConfigureAwait(false);
+                await _client.SetStatusAsync(discordStatus).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Failed to set Discord status: {ex}");
+            }
         }
 
         private UserStatus MapStatus(string status)
         {
-            switch (status.ToLower())
+            switch (status?.ToLowerInvariant())
             {
                 case "online":
                     return UserStatus.Online;

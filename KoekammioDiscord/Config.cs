@@ -9,10 +9,17 @@ namespace KoekammioDiscord
 
         public DiscordConfig discord { get; set; } = new DiscordConfig();
         public StatusMessages statuses { get; set; } = new StatusMessages();
+        public TimingSettings timing { get; set; } = new TimingSettings();
 
         public class DiscordConfig
         {
             public string token { get; set; } = "YOUR_DISCORD_BOT_TOKEN";
+        }
+
+        public class TimingSettings
+        {
+            public int pollIntervalSeconds { get; set; } = 5;
+            public int waitingForPlayersDelaySeconds { get; set; } = 3;
         }
 
         public class StatusMessages
