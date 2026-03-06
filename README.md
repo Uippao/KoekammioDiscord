@@ -1,5 +1,5 @@
 # KoekammioDiscord
-KoekammioDiscord is a simple but customizable event-based SCP:SL server status indicator bot. It is built on LabAPI and Discord.NET, aiming to provide an easy way to indicate the status of your SCP:SL server in your Discord server.
+KoekammioDiscord is a simple but customizable SCP:SL server status indicator bot. It is built on LabAPI and Discord.NET, aiming to provide an easy way to indicate the status of your SCP:SL server in your Discord server.
 The approach is to be very simple by only doing one thing. If you want a more extensive solution, this might not be for you. Despite this, it consists of only one component to further simplify the experience.
 KoekammioDiscord provides a simple configuration which allows you to customize/translate it to suit your needs.
 
@@ -33,6 +33,9 @@ statuses:
   round_ended:
     text: 'Players: {count}'
     status: online
+timing:
+  poll_interval_seconds: 5
+  waiting_for_players_delay_seconds: 3
 ```
 
 What the options do:
@@ -43,6 +46,8 @@ What the options do:
 - `no_players`: Sets the bot's status when the round has already started but there are zero people playing.
 - `players`: Sets the bot's status when the round is ongoing and there are players.
 - `round_ended`: Sets the bot's status when the round has already ended. By default it is "disabled", being set to the same as when there are players. This makes the two indistinguishable from the bot's status, but this can be changed.
+- `poll_interval_seconds`: Sets the amount of seconds between checking the amount of players.
+- `waiting_for_players_delay_seconds`: Sets the amount of extra seconds after round restart, which it waits to stabilize the number of people after they reconnect before sending in data.
 
 Keep in mind:
 - You can use "{count}" in the text fields of any status. It gets replaced by the current player count.
