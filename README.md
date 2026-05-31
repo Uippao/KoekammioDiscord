@@ -8,7 +8,7 @@ KoekammioDiscord provides a simple configuration which allows you to customize/t
 2. Place `KoekammioDiscord.dll` into `YOUR_SERVER_DIR/LabAPI/plugins/global/`, or alternatively into a specific port's directory instead of global.
 3. Extract `dependencies.zip` into `YOUR_SERVER_DIR/LabAPI/dependencies/global/`, or alternatively into a specific port's directory instead of global.
 4. Restart the server to generate the configs into `YOUR_SERVER_DIR/LabAPI/configs/PORT/KoekammioDiscord/config.yml`
-5. Create a discord bot. I'm too lazy to explain the process here, but there are loads of guides on how to do it.
+5. Create a Discord bot. I'm too lazy to explain the process here, but there are loads of guides on how to do it.
 6. Get your bot token, and replace the placeholder in the config with it. Configure further however you please.
 7. Add the bot to any servers you want it to be in, maybe give it a special role and place on the server list.
 8. You're done!
@@ -31,7 +31,7 @@ statuses:
     text: 'Players: {count}'
     status: online
   round_ended:
-    text: 'Players: {count}'
+    text: 'Round ended'
     status: online
 timing:
   poll_interval_seconds: 5
@@ -45,7 +45,7 @@ What the options do:
 - `waiting_for_players`: Sets the bot's status when the server is waiting for players (the round hasn't started yet).
 - `no_players`: Sets the bot's status when the round has already started but there are zero people playing.
 - `players`: Sets the bot's status when the round is ongoing and there are players.
-- `round_ended`: Sets the bot's status when the round has already ended. By default it is "disabled", being set to the same as when there are players. This makes the two indistinguishable from the bot's status, but this can be changed.
+- `round_ended`: Sets the bot's status when the round has already ended. If desired, the state can be "disabled", by setting it to `'Players: {count}'`, the same as when there are players. This makes the two indistinguishable from the bot's status.
 - `poll_interval_seconds`: Sets the amount of seconds between checking the amount of players.
 - `waiting_for_players_delay_seconds`: Sets the amount of extra seconds after round restart, which it waits to stabilize the number of people after they reconnect before sending in data.
 
@@ -55,3 +55,6 @@ Keep in mind:
 - You can disable text in a certain state by setting the text field empty (`""`).
 - You can disable distinguishing one state from another by setting the text and status to be the same.
 - The plugin supports the status values `online`, `idle`, `dnd` and `invisible`.
+
+## Switching to Fluxer from Discord?
+No worries! The KoekammioDiscord's sister project, [KoekammioFluxer](https://github.com/Uippao/KoekammioFluxer), has you covered! It forres a near identical config and feature set, and works basically the same as KoekammioDiscord in every way. It even supports custom instances of Fluxer, not just the official one. If you'd like to host your SCP:SL community on a FOSS platform, be sure to check it out to keep the same status display as your Discord server.
